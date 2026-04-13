@@ -1,5 +1,7 @@
 # Terraform OCI Free Tier
 
+[![Latest Release](https://img.shields.io/github/v/release/cloudplz/terraform-oci-free-tier)](https://github.com/cloudplz/terraform-oci-free-tier/releases/latest)
+[![Terraform Registry](https://img.shields.io/badge/Terraform%20Registry-cloudplz%2Ffree--tier%2Foci-blueviolet?logo=terraform)](https://registry.terraform.io/modules/cloudplz/free-tier/oci/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/cloudplz/terraform-oci-free-tier/ci.yml?branch=main&label=CI)](https://github.com/cloudplz/terraform-oci-free-tier/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 

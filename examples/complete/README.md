@@ -1,6 +1,6 @@
-# Example
+# Complete Example
 
-Deploys the OCI Always Free starter environment using all module defaults.
+Deploys all features enabled — 3 Arm VMs, MySQL, load balancers, Object Storage, and a KMS vault.
 
 ## Usage
 
@@ -8,43 +8,28 @@ Deploys the OCI Always Free starter environment using all module defaults.
 cd examples/complete
 terraform init
 terraform apply \
+  -var='compartment_id=ocid1.compartment.oc1..your_compartment' \
   -var='region=us-phoenix-1' \
-  -var='compartment_id=ocid1.compartment.oc1..YOUR_ID' \
-  -var='ssh_public_key=ssh-ed25519 AAAA... you@example'
-```
-
-Add `tenancy_id` (strongly recommended) to enable the budget safety net and home-region
-validation:
-
-```bash
-terraform apply \
-  -var='region=us-phoenix-1' \
-  -var='compartment_id=ocid1.compartment.oc1..YOUR_ID' \
-  -var='ssh_public_key=ssh-ed25519 AAAA... you@example' \
-  -var='tenancy_id=ocid1.tenancy.oc1..YOUR_ID'
+  -var='ssh_public_key=ssh-ed25519 AAAA... user@example'
 ```
 
 ## What gets created
 
-| Resource | Detail |
-|----------|--------|
-| VCN | 10.0.0.0/16 with public and private subnets |
-| 3 Arm VMs (A1 Flex) | 4 OCPUs, 24 GB RAM, 200 GB boot volume total |
-| MySQL DB System | `MySQL.Free` shape (50 GB, private subnet) |
-| Vault + encryption key | Stores MySQL admin password as a secret |
-| Flexible Load Balancer | 10 Mbps |
-| Network Load Balancer | 1 instance |
-| Object Storage bucket | 1 Standard tier bucket |
-| Budget + Alert | $1/month safety net (when `tenancy_id` is set) |
-
-To customize features, override variables, or enable paid add-ons like PostgreSQL, see the
-module [README](../../README.md) for the full variable reference.
+| Service | Detail |
+|---------|--------|
+| Compute | 3 Ampere A1 Flex VMs (4 OCPUs, 24 GB RAM, 200 GB boot) |
+| MySQL | MySQL.Free DB System, 50 GB storage |
+| Flexible Load Balancer | HTTP listener on port 80 |
+| Network Load Balancer | TCP listener on port 22 |
+| Object Storage | Encrypted bucket |
+| Vault | KMS vault + secrets for database passwords |
+| VCN | Public + private subnets, NAT gateway (if private instances) |
 
 ## Cleanup
 
 ```bash
 terraform destroy \
+  -var='compartment_id=ocid1.compartment.oc1..your_compartment' \
   -var='region=us-phoenix-1' \
-  -var='compartment_id=ocid1.compartment.oc1..YOUR_ID' \
-  -var='ssh_public_key=ssh-ed25519 AAAA... you@example'
+  -var='ssh_public_key=ssh-ed25519 AAAA... user@example'
 ```

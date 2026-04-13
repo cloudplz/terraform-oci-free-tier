@@ -1,9 +1,5 @@
-provider "oci" {
-  region = var.region
-}
-
 module "free_tier" {
-  source = "../../"
+  source = "../.."
 
   name           = "homelab"
   compartment_id = var.compartment_id
