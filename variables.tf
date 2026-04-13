@@ -262,7 +262,7 @@ variable "load_balancer_backend_instance_keys" {
   validation {
     condition = (
       var.load_balancer_backend_instance_keys == null ||
-      alltrue([for key in var.load_balancer_backend_instance_keys : contains(keys(var.compute_instances), key)])
+      try(alltrue([for key in var.load_balancer_backend_instance_keys : contains(keys(var.compute_instances), key)]), false)
     )
     error_message = "All load_balancer_backend_instance_keys must match keys in compute_instances."
   }
