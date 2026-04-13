@@ -1,0 +1,17 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.lock.info
+*.tfplan
+*.tfvars
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# .terraform.lock.hcl — intentionally tracked for reproducible builds
+examples/**/.terraform.lock.hcl
+
+# OS
+.DS_Store
