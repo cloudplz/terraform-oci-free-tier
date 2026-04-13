@@ -35,6 +35,9 @@ jobs:
         run: |
           for dir in examples/*/; do
             terraform -chdir="$dir" init -backend=false
+            TF_VAR_compartment_id=ocid1.compartment.oc1..example \
+            TF_VAR_region=us-phoenix-1 \
+            TF_VAR_ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICiKvExampleKey user@example" \
             terraform -chdir="$dir" validate
           done
 
