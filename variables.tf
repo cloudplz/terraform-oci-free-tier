@@ -158,7 +158,7 @@ variable "compute_instances" {
   validation {
     condition = alltrue([
       for instance in values(var.compute_instances) :
-      try(instance.availability_domain, null) == null || trimspace(instance.availability_domain) != ""
+      try(instance.availability_domain, null) == null || try(trimspace(instance.availability_domain), "") != ""
     ])
     error_message = "Each instance availability_domain must be null or a non-empty availability domain name."
   }
@@ -229,12 +229,15 @@ variable "mysql_admin_password" {
   validation {
     condition = (
       var.mysql_admin_password == null ||
-      can(regex("[A-Z]", var.mysql_admin_password)) &&
-      can(regex("[a-z]", var.mysql_admin_password)) &&
-      can(regex("[0-9]", var.mysql_admin_password)) &&
-      can(regex("[^a-zA-Z0-9]", var.mysql_admin_password)) &&
-      length(var.mysql_admin_password) >= 8 &&
-      length(var.mysql_admin_password) <= 32
+      try(
+        length(var.mysql_admin_password) >= 8 &&
+        length(var.mysql_admin_password) <= 32 &&
+        can(regex("[A-Z]", var.mysql_admin_password)) &&
+        can(regex("[a-z]", var.mysql_admin_password)) &&
+        can(regex("[0-9]", var.mysql_admin_password)) &&
+        can(regex("[^a-zA-Z0-9]", var.mysql_admin_password)),
+        false
+      )
     )
     error_message = "mysql_admin_password must be 8-32 characters and include upper, lower, numeric, and special characters."
   }
@@ -323,12 +326,15 @@ variable "postgresql_admin_password" {
   validation {
     condition = (
       var.postgresql_admin_password == null ||
-      can(regex("[A-Z]", var.postgresql_admin_password)) &&
-      can(regex("[a-z]", var.postgresql_admin_password)) &&
-      can(regex("[0-9]", var.postgresql_admin_password)) &&
-      can(regex("[^a-zA-Z0-9]", var.postgresql_admin_password)) &&
-      length(var.postgresql_admin_password) >= 8 &&
-      length(var.postgresql_admin_password) <= 32
+      try(
+        length(var.postgresql_admin_password) >= 8 &&
+        length(var.postgresql_admin_password) <= 32 &&
+        can(regex("[A-Z]", var.postgresql_admin_password)) &&
+        can(regex("[a-z]", var.postgresql_admin_password)) &&
+        can(regex("[0-9]", var.postgresql_admin_password)) &&
+        can(regex("[^a-zA-Z0-9]", var.postgresql_admin_password)),
+        false
+      )
     )
     error_message = "postgresql_admin_password must be 8-32 characters and include upper, lower, numeric, and special characters."
   }
