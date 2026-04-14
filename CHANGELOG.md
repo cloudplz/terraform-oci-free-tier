@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Fleet profiles via `profile` with `balanced` as the new default
+- Block volume support via `block_volumes`, including a new `block_volumes` output
+- Auto-mount cloud-init for one mount-point-bearing block volume per compute instance, with retry cron behavior
+- New `enable_keepalive` variable to control the idle-prevention cron setup
+- Plan-time checks for total storage budget, block volume attachment targets, block volume mount-point uniqueness, and effective load balancer backend keys
+- HCP Terraform guidance in the README for OCI credentials that must be passed as Terraform variables
+- Expanded tests covering profile behavior, keepalive/mount user data, and new validation rules
+
+### Changed
+
+- **BREAKING**: removed the `operating_system` input and standardized platform image selection on Ubuntu 24.04
+- Default fleet now comes from the `balanced` profile: 3 A1 VMs with 150 GB of boot volume storage and one 50 GB attached block volume
+- Compute, backup, image lookup, and outputs logic now consistently use effective profile-backed values instead of raw input maps
+- Boot volume validation remains at a 50 GB minimum and the README now documents the new profile-based layout and block volume behavior
+
+### Fixed
+
+- `load_balancer_backend_instance_keys` validation now works correctly with profile-backed defaults and no longer fails CI on null input
+- CI formatting drift after the profile/block-volume refactor was cleaned up
+
+## [1.0.0] - 2026-04-13
+
+### Added
+
+- `.tflint.hcl` with Terraform ruleset configuration for repository linting
+- Terraform Registry and Latest Release badges in the README
+- Improved `examples/complete/README.md` usage and service inventory documentation
+
+### Changed
+
+- Moved the example provider configuration out of `examples/complete/main.tf` into `examples/complete/terraform.tf` so the published module is Terraform Registry compliant
+- Refined the complete example structure and docs as part of the initial registry publishing prep
+
 ## [0.7.0] - 2026-04-13
 
 ### Added
@@ -149,6 +186,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI for formatting, validation, example validation, and tests
 - `terraform-docs` configuration and helper Makefile targets
 
+[Unreleased]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/cloudplz/terraform-oci-free-tier/releases/tag/v1.0.0
 [0.7.0]: https://github.com/cloudplz/terraform-oci-free-tier/releases/tag/v0.7.0
 [0.6.0]: https://github.com/cloudplz/terraform-oci-free-tier/releases/tag/v0.6.0
 [0.5.0]: https://github.com/cloudplz/terraform-oci-free-tier/releases/tag/v0.5.0
