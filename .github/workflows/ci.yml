@@ -13,6 +13,34 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  changelog:
+    name: Changelog
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Require changelog update for non-doc changes
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+
+          changed_files="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+
+          echo "Changed files:"
+          echo "$changed_files"
+
+          if echo "$changed_files" | grep -qx 'CHANGELOG.md'; then
+            exit 0
+          fi
+
+          if echo "$changed_files" | grep -Ev '^(CHANGELOG\.md|.*\.md)$' >/dev/null; then
+            echo "ERROR: This pull request changes non-Markdown files but does not update CHANGELOG.md."
+            echo "Add a changelog entry or limit the PR to docs-only changes."
+            exit 1
+          fi
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
