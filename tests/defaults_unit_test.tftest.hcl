@@ -630,7 +630,7 @@ run "keepalive_disabled_no_user_data_without_explicit" {
   }
 
   assert {
-    condition = lookup(oci_core_instance.vm["vm1"].metadata, "user_data", null) != null
+    condition     = lookup(oci_core_instance.vm["vm1"].metadata, "user_data", null) != null
     error_message = "vm1 should still get the block volume mount script even with keepalive disabled."
   }
 

@@ -180,45 +180,45 @@ locals {
     for key in local.instance_keys : key => (
       length(local._instance_mount_points[key]) > 0
       ? trimspace(join("\n", [
-          "#cloud-config",
-          "write_files:",
-          "  - path: /usr/local/bin/mount-block-volumes.sh",
-          "    permissions: '0755'",
-          "    content: |",
-          "      #!/bin/bash",
-          "      set -euo pipefail",
-          "      BOOT_DISK=$(lsblk -nro PKNAME \"$(findmnt -n -o SOURCE /)\" | head -1)",
-          "      MOUNT_POINTS=(${join(" ", [for mp in local._instance_mount_points[key] : "\"${mp}\""])})",
-          "      IDX=0",
-          "      for DEV in $(lsblk -dnpo NAME,TYPE | awk '$2==\"disk\"{print $1}'); do",
-          "        [ \"$(basename \"$DEV\")\" = \"$BOOT_DISK\" ] && continue",
-          "        [ \"$IDX\" -ge \"$${#MOUNT_POINTS[@]}\" ] && break",
-          "        MP=\"$${MOUNT_POINTS[$IDX]}\"",
-          "        if ! blkid \"$DEV\" >/dev/null 2>&1; then",
-          "          mkfs.ext4 -q \"$DEV\"",
-          "        fi",
-          "        mkdir -p \"$MP\"",
-          "        if ! mountpoint -q \"$MP\"; then",
-          "          if mount \"$DEV\" \"$MP\"; then",
-          "            UUID=$(blkid -s UUID -o value \"$DEV\")",
-          "            grep -q \"$UUID\" /etc/fstab 2>/dev/null || echo \"UUID=$UUID $MP ext4 defaults,nofail 0 2\" >> /etc/fstab",
-          "          fi",
-          "        fi",
-          "        IDX=$((IDX + 1))",
-          "      done",
-          "      ALL_MOUNTED=true",
-          "      for MP in \"$${MOUNT_POINTS[@]}\"; do",
-          "        mountpoint -q \"$MP\" || ALL_MOUNTED=false",
-          "      done",
-          "      if $ALL_MOUNTED; then",
-          "        rm -f /etc/cron.d/mount-block-volumes",
-          "      else",
-          "        echo '*/5 * * * * root /usr/local/bin/mount-block-volumes.sh >/dev/null 2>&1' > /etc/cron.d/mount-block-volumes",
-          "        chmod 0644 /etc/cron.d/mount-block-volumes",
-          "      fi",
-          "runcmd:",
-          "  - /usr/local/bin/mount-block-volumes.sh",
-        ]))
+        "#cloud-config",
+        "write_files:",
+        "  - path: /usr/local/bin/mount-block-volumes.sh",
+        "    permissions: '0755'",
+        "    content: |",
+        "      #!/bin/bash",
+        "      set -euo pipefail",
+        "      BOOT_DISK=$(lsblk -nro PKNAME \"$(findmnt -n -o SOURCE /)\" | head -1)",
+        "      MOUNT_POINTS=(${join(" ", [for mp in local._instance_mount_points[key] : "\"${mp}\""])})",
+        "      IDX=0",
+        "      for DEV in $(lsblk -dnpo NAME,TYPE | awk '$2==\"disk\"{print $1}'); do",
+        "        [ \"$(basename \"$DEV\")\" = \"$BOOT_DISK\" ] && continue",
+        "        [ \"$IDX\" -ge \"$${#MOUNT_POINTS[@]}\" ] && break",
+        "        MP=\"$${MOUNT_POINTS[$IDX]}\"",
+        "        if ! blkid \"$DEV\" >/dev/null 2>&1; then",
+        "          mkfs.ext4 -q \"$DEV\"",
+        "        fi",
+        "        mkdir -p \"$MP\"",
+        "        if ! mountpoint -q \"$MP\"; then",
+        "          if mount \"$DEV\" \"$MP\"; then",
+        "            UUID=$(blkid -s UUID -o value \"$DEV\")",
+        "            grep -q \"$UUID\" /etc/fstab 2>/dev/null || echo \"UUID=$UUID $MP ext4 defaults,nofail 0 2\" >> /etc/fstab",
+        "          fi",
+        "        fi",
+        "        IDX=$((IDX + 1))",
+        "      done",
+        "      ALL_MOUNTED=true",
+        "      for MP in \"$${MOUNT_POINTS[@]}\"; do",
+        "        mountpoint -q \"$MP\" || ALL_MOUNTED=false",
+        "      done",
+        "      if $ALL_MOUNTED; then",
+        "        rm -f /etc/cron.d/mount-block-volumes",
+        "      else",
+        "        echo '*/5 * * * * root /usr/local/bin/mount-block-volumes.sh >/dev/null 2>&1' > /etc/cron.d/mount-block-volumes",
+        "        chmod 0644 /etc/cron.d/mount-block-volumes",
+        "      fi",
+        "runcmd:",
+        "  - /usr/local/bin/mount-block-volumes.sh",
+      ]))
       : null
     )
   }
@@ -260,25 +260,25 @@ locals {
       length(local._instance_cloud_init_parts[key]) == 0
       ? null
       : length(local._instance_cloud_init_parts[key]) == 1
-        ? local._instance_cloud_init_parts[key][0].body
-        : join("\n", concat(
-            [
-              "Content-Type: multipart/mixed; boundary=\"${local.mime_boundary}\"",
-              "MIME-Version: 1.0",
-              "",
-            ],
-            flatten([
-              for part in local._instance_cloud_init_parts[key] : [
-                "--${local.mime_boundary}",
-                "Content-Type: ${part.content_type}; charset=\"us-ascii\"",
-                "MIME-Version: 1.0",
-                "",
-                part.body,
-                "",
-              ]
-            ]),
-            ["--${local.mime_boundary}--", ""],
-          ))
+      ? local._instance_cloud_init_parts[key][0].body
+      : join("\n", concat(
+        [
+          "Content-Type: multipart/mixed; boundary=\"${local.mime_boundary}\"",
+          "MIME-Version: 1.0",
+          "",
+        ],
+        flatten([
+          for part in local._instance_cloud_init_parts[key] : [
+            "--${local.mime_boundary}",
+            "Content-Type: ${part.content_type}; charset=\"us-ascii\"",
+            "MIME-Version: 1.0",
+            "",
+            part.body,
+            "",
+          ]
+        ]),
+        ["--${local.mime_boundary}--", ""],
+      ))
     )
   }
 
@@ -317,25 +317,25 @@ locals {
       length(local._micro_cloud_init_parts[key]) == 0
       ? null
       : length(local._micro_cloud_init_parts[key]) == 1
-        ? local._micro_cloud_init_parts[key][0].body
-        : join("\n", concat(
-            [
-              "Content-Type: multipart/mixed; boundary=\"${local.mime_boundary}\"",
-              "MIME-Version: 1.0",
-              "",
-            ],
-            flatten([
-              for part in local._micro_cloud_init_parts[key] : [
-                "--${local.mime_boundary}",
-                "Content-Type: ${part.content_type}; charset=\"us-ascii\"",
-                "MIME-Version: 1.0",
-                "",
-                part.body,
-                "",
-              ]
-            ]),
-            ["--${local.mime_boundary}--", ""],
-          ))
+      ? local._micro_cloud_init_parts[key][0].body
+      : join("\n", concat(
+        [
+          "Content-Type: multipart/mixed; boundary=\"${local.mime_boundary}\"",
+          "MIME-Version: 1.0",
+          "",
+        ],
+        flatten([
+          for part in local._micro_cloud_init_parts[key] : [
+            "--${local.mime_boundary}",
+            "Content-Type: ${part.content_type}; charset=\"us-ascii\"",
+            "MIME-Version: 1.0",
+            "",
+            part.body,
+            "",
+          ]
+        ]),
+        ["--${local.mime_boundary}--", ""],
+      ))
     )
   }
 

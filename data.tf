@@ -67,10 +67,10 @@ check "block_volume_attachment_targets" {
 
 check "load_balancer_backend_keys" {
   assert {
-    condition = (
-      var.load_balancer_backend_instance_keys == null ||
-      alltrue([for key in var.load_balancer_backend_instance_keys : contains(keys(local.effective_compute_instances), key)])
-    )
+    condition = alltrue([
+      for key in coalesce(var.load_balancer_backend_instance_keys, toset([])) :
+      contains(keys(local.effective_compute_instances), key)
+    ])
     error_message = "All load_balancer_backend_instance_keys must match keys in the effective compute_instances (profile or explicit)."
   }
 }

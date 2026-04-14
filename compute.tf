@@ -115,6 +115,6 @@ resource "oci_core_volume_attachment" "data" {
   for_each = local.effective_block_volumes
 
   attachment_type = "paravirtualized"
-  instance_id    = oci_core_instance.vm[each.value.attach_to].id
-  volume_id      = oci_core_volume.data[each.key].id
+  instance_id     = oci_core_instance.vm[each.value.attach_to].id
+  volume_id       = oci_core_volume.data[each.key].id
 }
