@@ -63,16 +63,16 @@ variables {
   ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakePublicKeyForTests user@example"
 }
 
-run "default_fleet_uses_three_instances" {
+run "default_balanced_profile_uses_three_instances" {
   command = plan
 
   assert {
     condition     = length(oci_core_instance.vm) == 3
-    error_message = "The default profile should create exactly three compute instances."
+    error_message = "The default balanced profile should create exactly three compute instances."
   }
 }
 
-run "default_fleet_consumes_full_a1_quota" {
+run "default_balanced_profile_consumes_full_a1_quota" {
   command = plan
 
   assert {
@@ -86,17 +86,129 @@ run "default_fleet_consumes_full_a1_quota" {
   }
 
   assert {
-    condition     = sum([for instance in values(oci_core_instance.vm) : instance.source_details[0].boot_volume_size_in_gbs]) == 200
-    error_message = "The default fleet should consume 200 GB of boot volume storage total."
+    condition     = sum([for instance in values(oci_core_instance.vm) : instance.source_details[0].boot_volume_size_in_gbs]) == 150
+    error_message = "The default balanced profile should consume 150 GB of boot volume storage (3x 50 GB)."
   }
 }
 
-run "no_amd_micro_instances_by_default" {
+run "default_balanced_profile_creates_one_block_volume" {
+  command = plan
+
+  assert {
+    condition     = length(oci_core_volume.data) == 1
+    error_message = "The default balanced profile should create exactly one block volume."
+  }
+
+  assert {
+    condition     = tonumber(oci_core_volume.data["data1"].size_in_gbs) == 50
+    error_message = "The default block volume should be 50 GB."
+  }
+}
+
+run "no_amd_micro_instances_for_balanced_profile" {
   command = plan
 
   assert {
     condition     = length(oci_core_instance.micro) == 0
-    error_message = "No AMD Micro instances should be created by default."
+    error_message = "No AMD Micro instances should be created for the balanced profile."
+  }
+}
+
+run "profile_compute_only_creates_four_vms" {
+  command = plan
+
+  variables {
+    profile = "compute-only"
+  }
+
+  assert {
+    condition     = length(oci_core_instance.vm) == 4
+    error_message = "The compute-only profile should create four A1 instances."
+  }
+
+  assert {
+    condition     = length(oci_core_volume.data) == 0
+    error_message = "The compute-only profile should create no block volumes."
+  }
+
+  assert {
+    condition     = length(oci_core_instance.micro) == 0
+    error_message = "The compute-only profile should create no AMD Micro instances."
+  }
+}
+
+run "profile_complete_creates_amd_micro" {
+  command = plan
+
+  variables {
+    profile = "complete"
+  }
+
+  assert {
+    condition     = length(oci_core_instance.vm) == 3
+    error_message = "The complete profile should create three A1 instances."
+  }
+
+  assert {
+    condition     = length(oci_core_instance.micro) == 1
+    error_message = "The complete profile should create one AMD Micro instance."
+  }
+
+  assert {
+    condition     = length(oci_core_volume.data) == 0
+    error_message = "The complete profile should create no block volumes."
+  }
+}
+
+run "profile_persistent_creates_two_vms_and_two_block_volumes" {
+  command = plan
+
+  variables {
+    profile = "persistent"
+  }
+
+  assert {
+    condition     = length(oci_core_instance.vm) == 2
+    error_message = "The persistent profile should create two A1 instances."
+  }
+
+  assert {
+    condition     = length(oci_core_volume.data) == 2
+    error_message = "The persistent profile should create two block volumes."
+  }
+}
+
+run "explicit_compute_instances_overrides_profile" {
+  command = plan
+
+  variables {
+    compute_instances = {
+      vm1 = {
+        assign_public_ip = true
+        boot_volume_gb   = 100
+        memory_gb        = 12
+        ocpus            = 2
+        subnet_role      = "public"
+      }
+      vm2 = {
+        assign_public_ip = true
+        boot_volume_gb   = 100
+        memory_gb        = 12
+        ocpus            = 2
+        subnet_role      = "public"
+      }
+    }
+    block_volumes = {}
+  }
+
+  assert {
+    condition     = length(oci_core_instance.vm) == 2
+    error_message = "Explicit compute_instances should override the profile."
+  }
+
+  assert {
+    condition     = sum([for i in values(oci_core_instance.vm) : i.source_details[0].boot_volume_size_in_gbs]) == 200
+    error_message = "Explicit compute_instances should use the specified boot volume sizes."
   }
 }
 
@@ -262,6 +374,7 @@ run "nat_gateway_created_for_private_instances" {
         subnet_role      = "public"
       }
     }
+    block_volumes = {}
   }
 
   assert {
@@ -304,6 +417,7 @@ run "instance_availability_domain_overrides_take_precedence" {
         subnet_role      = "public"
       }
     }
+    block_volumes = {}
   }
 
   assert {
@@ -493,5 +607,39 @@ run "budget_alert_created_with_email" {
   assert {
     condition     = oci_budget_alert_rule.any_spending[0].type == "ACTUAL"
     error_message = "Alert should use ACTUAL spending type."
+  }
+}
+
+run "keepalive_enabled_by_default_adds_user_data" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for instance in values(oci_core_instance.vm) :
+      lookup(instance.metadata, "user_data", null) != null
+    ])
+    error_message = "All A1 instances should have user_data when keepalive is enabled."
+  }
+}
+
+run "keepalive_disabled_no_user_data_without_explicit" {
+  command = plan
+
+  variables {
+    enable_keepalive = false
+  }
+
+  assert {
+    condition = lookup(oci_core_instance.vm["vm1"].metadata, "user_data", null) != null
+    error_message = "vm1 should still get the block volume mount script even with keepalive disabled."
+  }
+
+  assert {
+    condition = alltrue([
+      for key, instance in oci_core_instance.vm :
+      lookup(instance.metadata, "user_data", null) == null
+      if key != "vm1"
+    ])
+    error_message = "A1 instances without block volume mounts should have no user_data when keepalive is disabled."
   }
 }

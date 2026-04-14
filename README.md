@@ -14,14 +14,28 @@ Balancer, Network Load Balancer, and an Object Storage bucket. This module does 
 every OCI Always Free service -- see [Always Free Coverage](#always-free-coverage) for the full
 gap list.
 
-The default compute fleet uses the full Always Free A1 pooled limit:
+The default `balanced` profile uses the full Always Free A1 pooled limit:
 
-| Instance | OCPUs | RAM | Boot Volume |
-|----------|-------|-----|-------------|
-| `vm1` | 1 | 6 GB | 50 GB |
-| `vm2` | 1 | 6 GB | 50 GB |
-| `vm3` | 2 | 12 GB | 100 GB |
-| **Total** | **4** | **24 GB** | **200 GB** |
+| Instance | OCPUs | RAM | Boot Volume | Block Volume |
+|----------|-------|-----|-------------|--------------|
+| `vm1` | 1 | 6 GB | 50 GB | 50 GB |
+| `vm2` | 1 | 6 GB | 50 GB | -- |
+| `vm3` | 2 | 12 GB | 50 GB | -- |
+| **Total** | **4** | **24 GB** | **150 GB** | **50 GB** |
+
+Total storage: 200 GB (boot + block).
+
+## Fleet Profiles
+
+Set `profile` to select a pre-configured fleet. Individual variables (`compute_instances`,
+`amd_micro_instances`, `block_volumes`) still override the profile when explicitly set.
+
+| Profile | A1 VMs | AMD Micro | Block Volumes | Total Storage | Description |
+|---------|--------|-----------|---------------|---------------|-------------|
+| `persistent` | 2x (1 OCPU, 6 GB, 50 GB boot) | 0 | 2x 50 GB | 200 GB | Data durability -- each VM gets an attached data volume |
+| **`balanced`** (default) | 3x (1+1+2 OCPU, 6+6+12 GB, 50 GB boot) | 0 | 1x 50 GB | 200 GB | General purpose with one data volume on vm1 |
+| `complete` | 3x (1+1+2 OCPU, 6+6+12 GB, 50 GB boot) | 1x (1/8 OCPU, 1 GB, 50 GB boot) | 0 | 200 GB | Max compute, no data persistence |
+| `compute-only` | 4x (1 OCPU, 6 GB, 50 GB boot) | 0 | 0 | 200 GB | All A1, nothing else |
 
 ## Prerequisites
 
@@ -40,7 +54,8 @@ The default compute fleet uses the full Always Free A1 pooled limit:
 > out-of-capacity error, try a different availability domain or wait and retry.
 
 The module assumes OCI provider authentication is already configured through the OCI CLI config,
-environment variables, or another supported provider auth mechanism.
+environment variables, or another supported provider auth mechanism. See
+[HCP Terraform](#hcp-terraform) for HCP-specific guidance.
 
 ## Required IAM Permissions
 
@@ -179,6 +194,7 @@ category. Total: ~30 OCI resources, **$0/month** when deployed in the home regio
 | Private subnet + route table | `oci_core_subnet.private`, `oci_core_route_table.private` | Part of VCN |
 | Compute NSG (ICMP + optional SSH) | `oci_core_network_security_group.compute` | Part of VCN |
 | 3 Arm VM instances (VM.Standard.A1.Flex) | `oci_core_instance.vm["vm1"]` through `vm3` | 4 OCPUs, 24 GB, 200 GB validated |
+| 1 Block volume (50 GB, balanced profile) | `oci_core_volume.data["data1"]` | Shares 200 GB budget with boot volumes |
 | Object Storage bucket | `oci_objectstorage_bucket.main` | 20 GB total across all tiers -- **monitor usage** |
 
 ### Database
@@ -220,7 +236,7 @@ category. Total: ~30 OCI resources, **$0/month** when deployed in the home regio
 | Resource | How to Enable | Cost |
 |---|---|---|
 | Boot volume backup policy (bronze) | Set `features.boot_volume_backup = true` | Always Free up to 5 copies -- **charges likely** with default fleet |
-| AMD Micro instances (VM.Standard.E2.1.Micro) | Set `amd_micro_instances` map | Always Free (must be in a single AD in multi-AD regions) |
+| AMD Micro instances (VM.Standard.E2.1.Micro) | Set `amd_micro_instances` map or `profile = "complete"` | Always Free (must be in a single AD in multi-AD regions) |
 | NAT gateway | Auto-created when any instance uses `subnet_role = "private"` | Always Free |
 | PostgreSQL DB system | Set `features.postgresql = true` | **PAID** -- compute + storage charges apply |
 
@@ -304,6 +320,14 @@ These resources have usage-based limits that the module does not enforce:
   HeatWave cluster (`HeatWave.Free` shape) is not yet implemented by this module.
 - The PostgreSQL DB system (when enabled) is also placed in the private subnet, accessible on port
   5432 from within the VCN.
+- Block volumes are created and attached via paravirtualized attachment. When `mount_point` is set,
+  a cloud-init script formats the device (ext4) and mounts it automatically. On first deploy the
+  volume attachment may complete after cloud-init runs; a cron job retries every 5 minutes until the
+  mount succeeds, then removes itself.
+- **Shrinking a boot volume is a destructive operation.** OCI does not allow decreasing a boot
+  volume's size in place. If you reduce `boot_volume_gb` for an existing instance, Terraform will
+  need to destroy and recreate the instance (data loss). Always back up before changing boot volume
+  sizes downward.
 
 ## Troubleshooting
 
@@ -320,6 +344,44 @@ These resources have usage-based limits that the module does not enforce:
   is where Oracle applies most Always Free allowances. Set `tenancy_id` to enable the built-in
   home-region check.
 
+## HCP Terraform
+
+When running this module in HCP Terraform (or Terraform Cloud), OCI API credentials must be
+configured as workspace variables. PEM private keys contain newlines that HCP environment
+variables cannot represent, so **all OCI auth credentials must be Terraform variables** (not
+environment variables).
+
+| Variable | Type | Sensitive | Notes |
+|----------|------|-----------|-------|
+| `tenancy_ocid` | Terraform variable | No | OCID of the OCI tenancy |
+| `user_ocid` | Terraform variable | No | OCID of the API user |
+| `fingerprint` | Terraform variable | No | API key fingerprint |
+| `private_key` | Terraform variable | **Yes** | Full PEM contents (not a file path) |
+| `region` | Terraform variable or env var | No | Home region identifier (e.g. `us-phoenix-1`) |
+
+Configure the OCI provider to read from these variables:
+
+```hcl
+variable "tenancy_ocid" {}
+variable "user_ocid" {}
+variable "fingerprint" {}
+variable "private_key" { sensitive = true }
+variable "region" {}
+
+provider "oci" {
+  tenancy_ocid = var.tenancy_ocid
+  user_ocid    = var.user_ocid
+  fingerprint  = var.fingerprint
+  private_key  = var.private_key
+  region       = var.region
+}
+```
+
+> [!IMPORTANT]
+> The `private_key` variable must contain the full PEM contents, **not** a file path. Copy the
+> entire key including the `-----BEGIN RSA PRIVATE KEY-----` and `-----END RSA PRIVATE KEY-----`
+> lines into the variable value.
+
 ## Always Free Coverage
 
 How this module maps to the
@@ -332,7 +394,7 @@ as of April 2025.
 |---|---|---|
 | Compute -- Ampere A1 Flex | `oci_core_instance.vm` | 4 OCPUs, 24 GB RAM, 200 GB boot volume validated |
 | Compute -- AMD Micro | `oci_core_instance.micro` | Up to 2 instances, same-AD enforced |
-| Block Volume (boot volumes) | Validated via `compute_instances` / `amd_micro_instances` | 200 GB combined limit |
+| Block Volume (boot + data volumes) | `oci_core_volume.data`, validated via `compute_instances` / `amd_micro_instances` / `block_volumes` | 200 GB combined limit |
 | Boot Volume Backups | `oci_core_volume_backup_policy_assignment` | Off by default; 5-copy free limit |
 | Object Storage | `oci_objectstorage_bucket.main` | 1 Standard bucket; 20 GB total across tiers |
 | MySQL DB System | `oci_mysql_mysql_db_system.main` | `MySQL.Free` shape -- charges impossible |
@@ -452,12 +514,14 @@ regional availability at any time.
 | <a name="input_compartment_id"></a> [compartment\_id](#input\_compartment\_id) | OCID of the compartment where all resources will be created. | `string` | n/a | yes |
 | <a name="input_name"></a> [name](#input\_name) | Name prefix applied to created resources. Keep it short and lowercase. | `string` | n/a | yes |
 | <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | SSH public key added to each compute instance via cloud-init metadata. | `string` | n/a | yes |
-| <a name="input_amd_micro_instances"></a> [amd\_micro\_instances](#input\_amd\_micro\_instances) | Map of Always Free AMD Micro instances to create (VM.Standard.E2.1.Micro). Each instance has a fixed 1/8 OCPU and 1 GB RAM. Boot volumes share the 200 GB Always Free budget with A1 instances. | <pre>map(object({<br/>    assign_public_ip    = optional(bool, true)<br/>    availability_domain = optional(string)<br/>    boot_volume_gb      = optional(number, 50)<br/>    subnet_role         = optional(string, "public")<br/>  }))</pre> | `{}` | no |
+| <a name="input_amd_micro_instances"></a> [amd\_micro\_instances](#input\_amd\_micro\_instances) | Map of Always Free AMD Micro instances to create (VM.Standard.E2.1.Micro). Set to null to use the profile default. | <pre>map(object({<br/>    assign_public_ip    = optional(bool, true)<br/>    availability_domain = optional(string)<br/>    boot_volume_gb      = optional(number, 50)<br/>    subnet_role         = optional(string, "public")<br/>  }))</pre> | `null` | no |
 | <a name="input_availability_domain"></a> [availability\_domain](#input\_availability\_domain) | Default availability domain for compute instances. Set to null to use the first AD returned by OCI unless an instance overrides it. | `string` | `null` | no |
+| <a name="input_block_volumes"></a> [block\_volumes](#input\_block\_volumes) | Map of block volumes to create and attach to compute instances. Shares the 200 GB Always Free budget with boot volumes. At most one volume with `mount_point` per instance. Set to null to use the profile default. | <pre>map(object({<br/>    attach_to   = string<br/>    size_gb     = number<br/>    mount_point = optional(string)<br/>  }))</pre> | `null` | no |
 | <a name="input_budget_alert_email"></a> [budget\_alert\_email](#input\_budget\_alert\_email) | Email address for the budget alert rule. When set together with tenancy\_id and features.budget, the module creates a $1 monthly budget with an alert that fires when spending reaches the budget amount. | `string` | `null` | no |
 | <a name="input_budget_amount"></a> [budget\_amount](#input\_budget\_amount) | Monthly budget amount in the tenancy currency. Only used when features.budget is true and tenancy\_id is set. | `number` | `1` | no |
-| <a name="input_compute_instances"></a> [compute\_instances](#input\_compute\_instances) | Map of Always Free A1 instances to create. The default profile exactly consumes 4 OCPUs, 24 GB RAM, and 200 GB boot volume storage. | <pre>map(object({<br/>    assign_public_ip    = optional(bool, true)<br/>    availability_domain = optional(string)<br/>    boot_volume_gb      = number<br/>    memory_gb           = number<br/>    ocpus               = number<br/>    subnet_role         = optional(string, "public")<br/>    user_data           = optional(string)<br/>  }))</pre> | <pre>{<br/>  "vm1": {<br/>    "assign_public_ip": true,<br/>    "boot_volume_gb": 50,<br/>    "memory_gb": 6,<br/>    "ocpus": 1,<br/>    "subnet_role": "public"<br/>  },<br/>  "vm2": {<br/>    "assign_public_ip": true,<br/>    "boot_volume_gb": 50,<br/>    "memory_gb": 6,<br/>    "ocpus": 1,<br/>    "subnet_role": "public"<br/>  },<br/>  "vm3": {<br/>    "assign_public_ip": true,<br/>    "boot_volume_gb": 100,<br/>    "memory_gb": 12,<br/>    "ocpus": 2,<br/>    "subnet_role": "public"<br/>  }<br/>}</pre> | no |
+| <a name="input_compute_instances"></a> [compute\_instances](#input\_compute\_instances) | Map of Always Free A1 instances to create. Set to null to use the profile default. When set, overrides the profile entirely. | <pre>map(object({<br/>    assign_public_ip    = optional(bool, true)<br/>    availability_domain = optional(string)<br/>    boot_volume_gb      = number<br/>    memory_gb           = number<br/>    ocpus               = number<br/>    subnet_role         = optional(string, "public")<br/>    user_data           = optional(string)<br/>  }))</pre> | `null` | no |
 | <a name="input_defined_tags"></a> [defined\_tags](#input\_defined\_tags) | Defined tags applied to all supported OCI resources. | `map(string)` | `{}` | no |
+| <a name="input_enable_keepalive"></a> [enable\_keepalive](#input\_enable\_keepalive) | Install a cron-based keepalive on each compute instance to prevent Oracle from reclaiming idle Always Free VMs. | `bool` | `true` | no |
 | <a name="input_features"></a> [features](#input\_features) | Services to provision. Most Always Free services default to true. Boot volume backups and PostgreSQL default to false because they can incur charges with default settings. | <pre>object({<br/>    boot_volume_backup    = optional(bool, false)<br/>    budget                = optional(bool, true)<br/>    load_balancer         = optional(bool, true)<br/>    mysql                 = optional(bool, true)<br/>    network_load_balancer = optional(bool, true)<br/>    object_storage        = optional(bool, true)<br/>    postgresql            = optional(bool, false)<br/>    vault                 = optional(bool, true)<br/>  })</pre> | `{}` | no |
 | <a name="input_freeform_tags"></a> [freeform\_tags](#input\_freeform\_tags) | Free-form tags applied to all supported OCI resources. | `map(string)` | `{}` | no |
 | <a name="input_image_id_override"></a> [image\_id\_override](#input\_image\_id\_override) | Optional explicit OCI image OCID for the compute fleet. Use this if the platform image lookup does not return a match in your region or tenancy. | `string` | `null` | no |
@@ -468,19 +532,19 @@ regional availability at any time.
 | <a name="input_mysql_admin_username"></a> [mysql\_admin\_username](#input\_mysql\_admin\_username) | Admin username for the MySQL DB system. | `string` | `"admin"` | no |
 | <a name="input_network_load_balancer_port"></a> [network\_load\_balancer\_port](#input\_network\_load\_balancer\_port) | Port for the optional network load balancer listener and backends. | `number` | `80` | no |
 | <a name="input_object_storage_bucket_name"></a> [object\_storage\_bucket\_name](#input\_object\_storage\_bucket\_name) | Optional explicit bucket name. Leave null to let Terraform generate a unique one. | `string` | `null` | no |
-| <a name="input_operating_system"></a> [operating\_system](#input\_operating\_system) | OCI platform image operating system for the compute fleet. | `string` | `"Ubuntu"` | no |
-| <a name="input_operating_system_version"></a> [operating\_system\_version](#input\_operating\_system\_version) | Optional OCI platform image operating system version filter. Leave null to let OCI choose the newest image for the selected OS. | `string` | `null` | no |
+| <a name="input_operating_system_version"></a> [operating\_system\_version](#input\_operating\_system\_version) | Ubuntu version filter for OCI platform images. Defaults to 24.04 LTS. | `string` | `"24.04"` | no |
 | <a name="input_postgresql_admin_password"></a> [postgresql\_admin\_password](#input\_postgresql\_admin\_password) | Optional admin password for the PostgreSQL DB system. Leave null to let Terraform generate one when features.postgresql is true. | `string` | `null` | no |
 | <a name="input_postgresql_admin_username"></a> [postgresql\_admin\_username](#input\_postgresql\_admin\_username) | Admin username for the PostgreSQL DB system. | `string` | `"pgadmin"` | no |
 | <a name="input_postgresql_db_version"></a> [postgresql\_db\_version](#input\_postgresql\_db\_version) | PostgreSQL major version for the DB system. | `string` | `"16"` | no |
 | <a name="input_postgresql_instance_memory_size_in_gbs"></a> [postgresql\_instance\_memory\_size\_in\_gbs](#input\_postgresql\_instance\_memory\_size\_in\_gbs) | Memory in GB for the PostgreSQL DB system. Minimum 16 GB per OCPU. | `number` | `16` | no |
 | <a name="input_postgresql_instance_ocpu_count"></a> [postgresql\_instance\_ocpu\_count](#input\_postgresql\_instance\_ocpu\_count) | Number of OCPUs for the PostgreSQL DB system. Minimum 1. | `number` | `1` | no |
-| <a name="input_postgresql_shape"></a> [postgresql\_shape](#input\_postgresql\_shape) | Shape name for the PostgreSQL DB system. Uses the flexible shape with OCPU/memory controlled by postgresql\_instance\_ocpu\_count and postgresql\_instance\_memory\_size\_in\_gbs. | `string` | `"PostgreSQL.VM.Standard.E5.Flex"` | no |
+| <a name="input_postgresql_shape"></a> [postgresql\_shape](#input\_postgresql\_shape) | Shape name for the PostgreSQL DB system. | `string` | `"PostgreSQL.VM.Standard.E5.Flex"` | no |
 | <a name="input_private_subnet_cidr"></a> [private\_subnet\_cidr](#input\_private\_subnet\_cidr) | CIDR block for the private subnet. | `string` | `"10.0.2.0/24"` | no |
+| <a name="input_profile"></a> [profile](#input\_profile) | Fleet preset that pre-configures compute\_instances, amd\_micro\_instances, and block\_volumes. Individual variables still override the profile when explicitly set. | `string` | `"balanced"` | no |
 | <a name="input_public_subnet_cidr"></a> [public\_subnet\_cidr](#input\_public\_subnet\_cidr) | CIDR block for the public subnet. | `string` | `"10.0.1.0/24"` | no |
 | <a name="input_ssh_ingress_cidr"></a> [ssh\_ingress\_cidr](#input\_ssh\_ingress\_cidr) | Optional CIDR allowed to SSH into the compute fleet. Set null to create no SSH ingress rule. | `string` | `null` | no |
 | <a name="input_tenancy_id"></a> [tenancy\_id](#input\_tenancy\_id) | Optional tenancy OCID for home-region validation. When set, the module warns if resources are not being created in the tenancy home region where Always Free allowances apply. | `string` | `null` | no |
-| <a name="input_user_data"></a> [user\_data](#input\_user\_data) | Optional cloud-init or shell script user data. The module base64-encodes it before sending it to OCI. | `string` | `null` | no |
+| <a name="input_user_data"></a> [user\_data](#input\_user\_data) | Optional cloud-init or shell script user data. When enable\_keepalive is true, this is composed with the keepalive script via multipart MIME. | `string` | `null` | no |
 | <a name="input_vcn_cidr"></a> [vcn\_cidr](#input\_vcn\_cidr) | CIDR block for the VCN. | `string` | `"10.0.0.0/16"` | no |
 
 ## Outputs
@@ -489,6 +553,7 @@ regional availability at any time.
 |------|-------------|
 | <a name="output_amd_micro_instances"></a> [amd\_micro\_instances](#output\_amd\_micro\_instances) | Map of AMD Micro instance details keyed by instance name, or an empty map when none are configured. |
 | <a name="output_availability_domain"></a> [availability\_domain](#output\_availability\_domain) | Default availability domain used for compute instances without an explicit per-instance override. |
+| <a name="output_block_volumes"></a> [block\_volumes](#output\_block\_volumes) | Map of block volume details keyed by volume name, or an empty map when none are configured. |
 | <a name="output_budget_id"></a> [budget\_id](#output\_budget\_id) | OCID of the safety-net budget, or null when disabled or tenancy\_id is not set. |
 | <a name="output_compute_instances"></a> [compute\_instances](#output\_compute\_instances) | Map of compute instance details keyed by instance name. |
 | <a name="output_load_balancer_id"></a> [load\_balancer\_id](#output\_load\_balancer\_id) | OCID of the optional load balancer, or null when disabled. |

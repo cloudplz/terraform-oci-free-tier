@@ -9,7 +9,7 @@ data "oci_core_images" "a1" {
 }
 
 data "oci_core_images" "micro" {
-  count = length(var.amd_micro_instances) > 0 ? 1 : 0
+  count = length(local.effective_amd_micro_instances) > 0 ? 1 : 0
 
   compartment_id           = var.compartment_id
   operating_system         = local.image_operating_system
@@ -35,6 +35,44 @@ data "oci_objectstorage_namespace" "this" {
 
 data "oci_core_volume_backup_policies" "oracle_defined" {
   count = var.features.boot_volume_backup ? 1 : 0
+}
+
+check "total_storage_budget" {
+  assert {
+    condition     = local.total_storage_gb <= 200
+    error_message = "Total storage (boot + block volumes) is ${local.total_storage_gb} GB, which exceeds the 200 GB Always Free limit."
+  }
+}
+
+check "block_volume_mount_uniqueness" {
+  assert {
+    condition = length([
+      for target in distinct([for v in values(local.effective_block_volumes) : v.attach_to if v.mount_point != null]) :
+      target
+      if length([for v in values(local.effective_block_volumes) : v if v.attach_to == target && v.mount_point != null]) > 1
+    ]) == 0
+    error_message = "Each compute instance may have at most one block volume with mount_point set."
+  }
+}
+
+check "block_volume_attachment_targets" {
+  assert {
+    condition = alltrue([
+      for key, vol in local.effective_block_volumes :
+      contains(keys(local.effective_compute_instances), vol.attach_to)
+    ])
+    error_message = "One or more block volumes reference a compute instance key that does not exist."
+  }
+}
+
+check "load_balancer_backend_keys" {
+  assert {
+    condition = (
+      var.load_balancer_backend_instance_keys == null ||
+      alltrue([for key in var.load_balancer_backend_instance_keys : contains(keys(local.effective_compute_instances), key)])
+    )
+    error_message = "All load_balancer_backend_instance_keys must match keys in the effective compute_instances (profile or explicit)."
+  }
 }
 
 check "home_region" {

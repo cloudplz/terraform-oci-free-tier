@@ -72,12 +72,13 @@ run "rejects_more_than_four_ocpus" {
         subnet_role      = "public"
       }
     }
+    block_volumes = {}
   }
 
   expect_failures = [var.compute_instances]
 }
 
-run "rejects_more_than_two_hundred_gb_of_storage" {
+run "rejects_more_than_two_hundred_gb_of_boot_storage" {
   command = plan
 
   variables {
@@ -104,6 +105,7 @@ run "rejects_more_than_two_hundred_gb_of_storage" {
         subnet_role      = "public"
       }
     }
+    block_volumes = {}
   }
 
   expect_failures = [var.compute_instances]
@@ -122,6 +124,7 @@ run "rejects_private_instances_requesting_public_ips" {
         subnet_role      = "private"
       }
     }
+    block_volumes = {}
   }
 
   expect_failures = [var.compute_instances]
@@ -146,6 +149,8 @@ run "rejects_more_than_two_amd_micro_instances" {
       micro2 = { boot_volume_gb = 50 }
       micro3 = { boot_volume_gb = 50 }
     }
+
+    block_volumes = {}
   }
 
   expect_failures = [var.amd_micro_instances]
@@ -169,6 +174,8 @@ run "rejects_combined_storage_over_two_hundred_gb" {
       micro1 = { boot_volume_gb = 60 }
       micro2 = { boot_volume_gb = 60 }
     }
+
+    block_volumes = {}
   }
 
   expect_failures = [var.amd_micro_instances]
@@ -198,6 +205,8 @@ run "rejects_amd_micro_instances_in_different_ads" {
         availability_domain = "kIdk:PHX-AD-2"
       }
     }
+
+    block_volumes = {}
   }
 
   expect_failures = [var.amd_micro_instances]
@@ -237,4 +246,55 @@ run "rejects_postgresql_memory_below_sixteen_gb_per_ocpu" {
   }
 
   expect_failures = [var.postgresql_instance_memory_size_in_gbs]
+}
+
+run "rejects_invalid_profile_name" {
+  command = plan
+
+  variables {
+    profile = "invalid"
+  }
+
+  expect_failures = [var.profile]
+}
+
+run "rejects_block_volume_below_minimum_size" {
+  command = plan
+
+  variables {
+    compute_instances = {
+      vm1 = {
+        assign_public_ip = true
+        boot_volume_gb   = 50
+        memory_gb        = 24
+        ocpus            = 4
+        subnet_role      = "public"
+      }
+    }
+
+    block_volumes = {
+      data1 = { attach_to = "vm1", size_gb = 30 }
+    }
+  }
+
+  expect_failures = [var.block_volumes]
+}
+
+run "rejects_boot_volume_below_50_gb" {
+  command = plan
+
+  variables {
+    compute_instances = {
+      vm1 = {
+        assign_public_ip = true
+        boot_volume_gb   = 47
+        memory_gb        = 24
+        ocpus            = 4
+        subnet_role      = "public"
+      }
+    }
+    block_volumes = {}
+  }
+
+  expect_failures = [var.compute_instances]
 }

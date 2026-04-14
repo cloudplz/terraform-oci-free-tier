@@ -1,56 +1,102 @@
 variable "amd_micro_instances" {
-  description = "Map of Always Free AMD Micro instances to create (VM.Standard.E2.1.Micro). Each instance has a fixed 1/8 OCPU and 1 GB RAM. Boot volumes share the 200 GB Always Free budget with A1 instances."
+  description = "Map of Always Free AMD Micro instances to create (VM.Standard.E2.1.Micro). Each instance has a fixed 1/8 OCPU and 1 GB RAM. Boot volumes share the 200 GB Always Free budget with A1 instances. Set to null to use the profile default."
   type = map(object({
     assign_public_ip    = optional(bool, true)
     availability_domain = optional(string)
     boot_volume_gb      = optional(number, 50)
     subnet_role         = optional(string, "public")
   }))
-  default = {}
+  default = null
 
   validation {
-    condition     = length(var.amd_micro_instances) <= 2
+    condition     = try(length(var.amd_micro_instances) <= 2, true)
     error_message = "The OCI Always Free tier supports at most 2 AMD Micro instances."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.amd_micro_instances) :
       instance.boot_volume_gb >= 50
-    ])
+    ]), true)
     error_message = "Each AMD Micro boot volume must be at least 50 GB."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.amd_micro_instances) :
       contains(["public", "private"], try(instance.subnet_role, "public"))
-    ])
+    ]), true)
     error_message = "Each subnet_role must be either public or private."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.amd_micro_instances) :
       !(try(instance.assign_public_ip, true) && try(instance.subnet_role, "public") == "private")
-    ])
+    ]), true)
     error_message = "AMD Micro instances in the private subnet cannot request a public IP."
   }
 
   validation {
-    condition = length(distinct([
+    condition = try(length(distinct([
       for i in values(var.amd_micro_instances) :
       coalesce(try(i.availability_domain, null), "default")
-    ])) <= 1
+    ])) <= 1, true)
     error_message = "In multi-AD regions, all AMD Micro instances must use the same availability domain."
   }
 
   validation {
-    condition = (
-      sum(concat([for i in values(var.amd_micro_instances) : i.boot_volume_gb], [0])) +
-      sum(concat([for i in values(var.compute_instances) : i.boot_volume_gb], [0])) <= 200
+    condition = try(
+      sum(concat([for i in values(coalesce(var.amd_micro_instances, {})) : i.boot_volume_gb], [0])) +
+      sum(concat([for i in values(coalesce(var.compute_instances, {})) : i.boot_volume_gb], [0])) +
+      sum(concat([for i in values(coalesce(var.block_volumes, {})) : i.size_gb], [0])) <= 200,
+      true
     )
-    error_message = "Combined boot volume storage across A1 and AMD Micro instances cannot exceed 200 GB."
+    error_message = "Combined boot and block volume storage across all instance types cannot exceed 200 GB."
+  }
+}
+
+variable "block_volumes" {
+  description = "Map of block volumes to create and attach to compute instances. Shares the 200 GB Always Free budget with boot volumes. Set to null to use the profile default."
+  type = map(object({
+    attach_to   = string
+    size_gb     = number
+    mount_point = optional(string)
+  }))
+  default = null
+
+  validation {
+    condition = try(alltrue([
+      for v in values(var.block_volumes) :
+      v.size_gb >= 50
+    ]), true)
+    error_message = "Each block volume must be at least 50 GB."
+  }
+
+  validation {
+    condition = try(
+      var.block_volumes == null ||
+      var.compute_instances == null ||
+      alltrue([
+        for v in values(var.block_volumes) :
+        contains(keys(var.compute_instances), v.attach_to)
+      ]),
+      true
+    )
+    error_message = "Each block volume attach_to must reference a key in compute_instances."
+  }
+
+  validation {
+    condition = try(
+      var.block_volumes == null ||
+      length([
+        for target in distinct([for v in values(var.block_volumes) : v.attach_to if v.mount_point != null]) :
+        target
+        if length([for v in values(var.block_volumes) : v if v.attach_to == target && v.mount_point != null]) > 1
+      ]) == 0,
+      true
+    )
+    error_message = "Each compute instance may have at most one block volume with mount_point set. The auto-mount script cannot deterministically map multiple volumes to mount points."
   }
 }
 
@@ -83,7 +129,7 @@ variable "compartment_id" {
 }
 
 variable "compute_instances" {
-  description = "Map of Always Free A1 instances to create. The default profile exactly consumes 4 OCPUs, 24 GB RAM, and 200 GB boot volume storage."
+  description = "Map of Always Free A1 instances to create. Set to null to use the profile default. When set, overrides the profile entirely."
   type = map(object({
     assign_public_ip    = optional(bool, true)
     availability_domain = optional(string)
@@ -93,96 +139,73 @@ variable "compute_instances" {
     subnet_role         = optional(string, "public")
     user_data           = optional(string)
   }))
-
-  default = {
-    vm1 = {
-      assign_public_ip = true
-      boot_volume_gb   = 50
-      memory_gb        = 6
-      ocpus            = 1
-      subnet_role      = "public"
-    }
-    vm2 = {
-      assign_public_ip = true
-      boot_volume_gb   = 50
-      memory_gb        = 6
-      ocpus            = 1
-      subnet_role      = "public"
-    }
-    vm3 = {
-      assign_public_ip = true
-      boot_volume_gb   = 100
-      memory_gb        = 12
-      ocpus            = 2
-      subnet_role      = "public"
-    }
-  }
+  default = null
 
   validation {
-    condition     = length(var.compute_instances) >= 1 && length(var.compute_instances) <= 4
+    condition     = try(length(var.compute_instances) >= 1 && length(var.compute_instances) <= 4, true)
     error_message = "compute_instances must contain between 1 and 4 instances."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.compute_instances) :
       floor(instance.ocpus) == instance.ocpus && instance.ocpus >= 1
-    ])
+    ]), true)
     error_message = "Each instance must request a whole-number OCPU count greater than or equal to 1."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.compute_instances) :
       floor(instance.memory_gb) == instance.memory_gb && instance.memory_gb >= 1
-    ])
+    ]), true)
     error_message = "Each instance must request a whole-number memory size in GB greater than or equal to 1."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.compute_instances) :
       instance.boot_volume_gb >= 50
-    ])
+    ]), true)
     error_message = "Each boot volume must be at least 50 GB."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.compute_instances) :
       contains(["public", "private"], try(instance.subnet_role, "public"))
-    ])
+    ]), true)
     error_message = "Each subnet_role must be either public or private."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.compute_instances) :
       try(instance.availability_domain, null) == null || try(trimspace(instance.availability_domain), "") != ""
-    ])
+    ]), true)
     error_message = "Each instance availability_domain must be null or a non-empty availability domain name."
   }
 
   validation {
-    condition = alltrue([
+    condition = try(alltrue([
       for instance in values(var.compute_instances) :
       !(try(instance.assign_public_ip, true) && try(instance.subnet_role, "public") == "private")
-    ])
+    ]), true)
     error_message = "Instances in the private subnet cannot request a public IP."
   }
 
   validation {
-    condition     = sum([for instance in values(var.compute_instances) : instance.ocpus]) <= 4
+    condition     = try(sum([for instance in values(var.compute_instances) : instance.ocpus]) <= 4, true)
     error_message = "The OCI Always Free A1 pool supports at most 4 total OCPUs."
   }
 
   validation {
-    condition     = sum([for instance in values(var.compute_instances) : instance.memory_gb]) <= 24
+    condition     = try(sum([for instance in values(var.compute_instances) : instance.memory_gb]) <= 24, true)
     error_message = "The OCI Always Free A1 pool supports at most 24 total GB of memory."
   }
 
   validation {
-    condition     = sum([for i in values(var.compute_instances) : i.boot_volume_gb]) <= 200
+    condition     = try(sum([for i in values(var.compute_instances) : i.boot_volume_gb]) <= 200, true)
     error_message = "The OCI Always Free pool supports at most 200 total GB of boot and block volume storage."
   }
 }
@@ -191,6 +214,12 @@ variable "defined_tags" {
   description = "Defined tags applied to all supported OCI resources."
   type        = map(string)
   default     = {}
+}
+
+variable "enable_keepalive" {
+  description = "Install a cron-based keepalive on each compute instance to prevent Oracle from reclaiming idle Always Free VMs."
+  type        = bool
+  default     = true
 }
 
 variable "features" {
@@ -262,7 +291,8 @@ variable "load_balancer_backend_instance_keys" {
   validation {
     condition = (
       var.load_balancer_backend_instance_keys == null ||
-      try(alltrue([for key in var.load_balancer_backend_instance_keys : contains(keys(var.compute_instances), key)]), false)
+      var.compute_instances == null ||
+      try(alltrue([for key in var.load_balancer_backend_instance_keys : contains(keys(var.compute_instances), key)]), true)
     )
     error_message = "All load_balancer_backend_instance_keys must match keys in compute_instances."
   }
@@ -315,6 +345,12 @@ variable "object_storage_bucket_name" {
   description = "Optional explicit bucket name. Leave null to let Terraform generate a unique one."
   type        = string
   default     = null
+}
+
+variable "operating_system_version" {
+  description = "Ubuntu version filter for OCI platform images. Defaults to 24.04 LTS."
+  type        = string
+  default     = "24.04"
 }
 
 variable "postgresql_admin_password" {
@@ -393,23 +429,6 @@ variable "postgresql_instance_memory_size_in_gbs" {
   }
 }
 
-variable "operating_system" {
-  description = "OCI platform image operating system for the compute fleet."
-  type        = string
-  default     = "Ubuntu"
-
-  validation {
-    condition     = contains(["Oracle Linux", "Ubuntu"], var.operating_system)
-    error_message = "operating_system must be Oracle Linux or Ubuntu."
-  }
-}
-
-variable "operating_system_version" {
-  description = "Optional OCI platform image operating system version filter. Leave null to let OCI choose the newest image for the selected OS."
-  type        = string
-  default     = null
-}
-
 variable "private_subnet_cidr" {
   description = "CIDR block for the private subnet."
   type        = string
@@ -418,6 +437,17 @@ variable "private_subnet_cidr" {
   validation {
     condition     = can(cidrhost(var.private_subnet_cidr, 0))
     error_message = "private_subnet_cidr must be a valid IPv4 CIDR block."
+  }
+}
+
+variable "profile" {
+  description = "Fleet preset that pre-configures compute_instances, amd_micro_instances, and block_volumes. Individual variables still override the profile when explicitly set."
+  type        = string
+  default     = "balanced"
+
+  validation {
+    condition     = contains(["persistent", "balanced", "complete", "compute-only"], var.profile)
+    error_message = "profile must be one of: persistent, balanced, complete, compute-only."
   }
 }
 
@@ -462,7 +492,7 @@ variable "tenancy_id" {
 }
 
 variable "user_data" {
-  description = "Optional cloud-init or shell script user data. The module base64-encodes it before sending it to OCI."
+  description = "Optional cloud-init or shell script user data. The module base64-encodes it before sending it to OCI. When enable_keepalive is true, this is composed with the keepalive script via multipart MIME."
   type        = string
   default     = null
 }

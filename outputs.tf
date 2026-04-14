@@ -7,7 +7,7 @@ output "amd_micro_instances" {
       id                  = instance.id
       private_ip          = instance.private_ip
       public_ip           = try(instance.public_ip, null)
-      subnet_role         = try(var.amd_micro_instances[key].subnet_role, "public")
+      subnet_role         = try(local.effective_amd_micro_instances[key].subnet_role, "public")
     }
   }
 }
@@ -32,7 +32,7 @@ output "compute_instances" {
       ocpus               = instance.shape_config[0].ocpus
       private_ip          = instance.private_ip
       public_ip           = try(instance.public_ip, null)
-      subnet_role         = try(var.compute_instances[key].subnet_role, "public")
+      subnet_role         = try(local.effective_compute_instances[key].subnet_role, "public")
     }
   }
 }
@@ -142,4 +142,16 @@ output "postgresql_admin_password_secret_id" {
 output "vcn_id" {
   description = "OCID of the VCN."
   value       = oci_core_vcn.main.id
+}
+
+output "block_volumes" {
+  description = "Map of block volume details keyed by volume name, or an empty map when none are configured."
+  value = {
+    for key, vol in oci_core_volume.data : key => {
+      id            = vol.id
+      attachment_id = oci_core_volume_attachment.data[key].id
+      device        = try(oci_core_volume_attachment.data[key].device, null)
+      mount_point   = try(local.effective_block_volumes[key].mount_point, null)
+    }
+  }
 }
