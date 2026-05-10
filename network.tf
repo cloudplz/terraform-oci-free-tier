@@ -127,7 +127,7 @@ resource "oci_core_default_security_list" "main" {
   ingress_security_rules {
     description = "Allow SSH ingress"
     protocol    = "6"
-    source      = var.ssh_ingress_cidr == null ? "10.0.0.0/16" : var.ssh_ingress_cidr
+    source      = "0.0.0.0/0"
     source_type = "CIDR_BLOCK"
 
     tcp_options {
