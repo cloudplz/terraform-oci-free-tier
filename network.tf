@@ -154,6 +154,23 @@ resource "oci_core_network_security_group_security_rule" "compute_ingress_ssh" {
   }
 }
 
+resource "oci_core_network_security_group_security_rule" "compute_ingress_https" {
+  count = var.https_ingress_cidr == null ? 0 : 1
+
+  direction                 = "INGRESS"
+  network_security_group_id = oci_core_network_security_group.compute.id
+  protocol                  = "6"
+  source                    = var.https_ingress_cidr
+  source_type               = "CIDR_BLOCK"
+
+  tcp_options {
+    destination_port_range {
+      max = 443
+      min = 443
+    }
+  }
+}
+
 resource "oci_core_network_security_group_security_rule" "compute_ingress_icmp" {
   direction                 = "INGRESS"
   network_security_group_id = oci_core_network_security_group.compute.id
