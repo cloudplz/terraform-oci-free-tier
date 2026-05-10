@@ -118,6 +118,60 @@ resource "oci_core_subnet" "public" {
 }
 
 # -----------------------------------------------------------------------------
+# Default Security List (manages rules on the VCN default security list)
+# -----------------------------------------------------------------------------
+
+resource "oci_core_default_security_list" "main" {
+  manage_default_resource_id = oci_core_vcn.main.default_security_list_id
+
+  ingress_security_rules {
+    description = "Allow SSH ingress"
+    protocol    = "6"
+    source      = var.ssh_ingress_cidr == null ? "10.0.0.0/16" : var.ssh_ingress_cidr
+    source_type = "CIDR_BLOCK"
+
+    tcp_options {
+      max = 22
+      min = 22
+    }
+  }
+
+  dynamic "ingress_security_rules" {
+    for_each = var.https_ingress_cidr != null ? [1] : []
+    content {
+      description = "Allow HTTPS ingress"
+      protocol    = "6"
+      source      = var.https_ingress_cidr
+      source_type = "CIDR_BLOCK"
+
+      tcp_options {
+        max = 443
+        min = 443
+      }
+    }
+  }
+
+  ingress_security_rules {
+    description = "Allow ICMP from VCN"
+    protocol    = "1"
+    source      = var.vcn_cidr
+    source_type = "CIDR_BLOCK"
+
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
+
+  egress_security_rules {
+    description      = "Allow all egress"
+    destination      = "0.0.0.0/0"
+    destination_type = "CIDR_BLOCK"
+    protocol         = "all"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Compute NSG
 # -----------------------------------------------------------------------------
 
