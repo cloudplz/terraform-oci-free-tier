@@ -672,3 +672,21 @@ run "compute_ingress_tcp_rules_create_nsg_rules" {
     error_message = "The compute ingress TCP rule should use the configured destination port."
   }
 }
+
+run "https_ingress_cidr_creates_compatibility_rule" {
+  command = plan
+
+  variables {
+    https_ingress_cidr = "0.0.0.0/0"
+  }
+
+  assert {
+    condition     = length(oci_core_network_security_group_security_rule.compute_ingress_https) == 1
+    error_message = "https_ingress_cidr should create one HTTPS ingress rule for compatibility."
+  }
+
+  assert {
+    condition     = oci_core_network_security_group_security_rule.compute_ingress_https[0].source == "0.0.0.0/0"
+    error_message = "The HTTPS compatibility rule should use the configured source CIDR."
+  }
+}

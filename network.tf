@@ -118,6 +118,33 @@ resource "oci_core_subnet" "public" {
 }
 
 # -----------------------------------------------------------------------------
+# Default Security List (managed to remove OCI's broad default SSH ingress)
+# -----------------------------------------------------------------------------
+
+resource "oci_core_default_security_list" "main" {
+  manage_default_resource_id = oci_core_vcn.main.default_security_list_id
+
+  ingress_security_rules {
+    description = "Allow ICMP fragmentation-needed messages from the VCN"
+    protocol    = "1"
+    source      = var.vcn_cidr
+    source_type = "CIDR_BLOCK"
+
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
+
+  egress_security_rules {
+    description      = "Allow all egress"
+    destination      = "0.0.0.0/0"
+    destination_type = "CIDR_BLOCK"
+    protocol         = "all"
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Compute NSG
 # -----------------------------------------------------------------------------
 
@@ -150,6 +177,24 @@ resource "oci_core_network_security_group_security_rule" "compute_ingress_ssh" {
     destination_port_range {
       max = 22
       min = 22
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "compute_ingress_https" {
+  count = var.https_ingress_cidr == null ? 0 : 1
+
+  description               = "HTTPS ingress"
+  direction                 = "INGRESS"
+  network_security_group_id = oci_core_network_security_group.compute.id
+  protocol                  = "6"
+  source                    = var.https_ingress_cidr
+  source_type               = "CIDR_BLOCK"
+
+  tcp_options {
+    destination_port_range {
+      max = 443
+      min = 443
     }
   }
 }

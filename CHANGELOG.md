@@ -5,13 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.3] - 2026-05-10
+## [1.0.6] - 2026-05-10
 
 ### Added
 
 - New `compute_ingress_tcp_rules` input for adding explicit TCP ingress rules to the compute network security group while keeping SSH ingress controlled separately
 - New `compute_network_security_group_id` output for automation that needs to reference the compute NSG directly
 - Tests covering compute TCP ingress rule creation and validation for invalid ports or CIDR blocks
+
+### Fixed
+
+- Carries forward the previously tagged `https_ingress_cidr` compatibility input while recommending `compute_ingress_tcp_rules` for new custom service ingress
+- Manages the VCN default security list without broad public SSH ingress so compute access is controlled by the compute NSG rules
 
 ### Changed
 
@@ -198,7 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI for formatting, validation, example validation, and tests
 - `terraform-docs` configuration and helper Makefile targets
 
-[1.0.3]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.2...v1.0.3
+[1.0.6]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.5...v1.0.6
 [1.0.2]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.0...v1.0.2
 [1.0.0]: https://github.com/cloudplz/terraform-oci-free-tier/releases/tag/v1.0.0
 [0.7.0]: https://github.com/cloudplz/terraform-oci-free-tier/releases/tag/v0.7.0

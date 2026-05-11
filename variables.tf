@@ -499,6 +499,17 @@ variable "ssh_ingress_cidr" {
   }
 }
 
+variable "https_ingress_cidr" {
+  description = "Optional CIDR allowed to access HTTPS (TCP 443) on the compute fleet. Set null to create no HTTPS ingress rule. For new custom services, prefer compute_ingress_tcp_rules."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.https_ingress_cidr == null || can(cidrhost(var.https_ingress_cidr, 0))
+    error_message = "https_ingress_cidr must be null or a valid IPv4 CIDR block."
+  }
+}
+
 variable "ssh_public_key" {
   description = "SSH public key added to each compute instance via cloud-init metadata."
   type        = string

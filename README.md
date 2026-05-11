@@ -462,6 +462,7 @@ regional availability at any time.
 |------|------|
 | [oci_budget_alert_rule.any_spending](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/budget_alert_rule) | resource |
 | [oci_budget_budget.free_tier](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/budget_budget) | resource |
+| [oci_core_default_security_list.main](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_default_security_list) | resource |
 | [oci_core_instance.micro](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_instance) | resource |
 | [oci_core_instance.vm](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_instance) | resource |
 | [oci_core_internet_gateway.main](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_internet_gateway) | resource |
@@ -470,6 +471,7 @@ regional availability at any time.
 | [oci_core_network_security_group.load_balancer](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group) | resource |
 | [oci_core_network_security_group.network_load_balancer](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group) | resource |
 | [oci_core_network_security_group_security_rule.compute_egress_all](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
+| [oci_core_network_security_group_security_rule.compute_ingress_https](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
 | [oci_core_network_security_group_security_rule.compute_ingress_icmp](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
 | [oci_core_network_security_group_security_rule.compute_ingress_icmp_echo](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
 | [oci_core_network_security_group_security_rule.compute_ingress_load_balancer](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
@@ -528,6 +530,7 @@ regional availability at any time.
 | <a name="input_enable_keepalive"></a> [enable\_keepalive](#input\_enable\_keepalive) | Install a cron-based keepalive on each compute instance to prevent Oracle from reclaiming idle Always Free VMs. | `bool` | `true` | no |
 | <a name="input_features"></a> [features](#input\_features) | Services to provision. Most Always Free services default to true. Boot volume backups and PostgreSQL default to false because they can incur charges with default settings. | <pre>object({<br/>    boot_volume_backup    = optional(bool, false)<br/>    budget                = optional(bool, true)<br/>    load_balancer         = optional(bool, true)<br/>    mysql                 = optional(bool, true)<br/>    network_load_balancer = optional(bool, true)<br/>    object_storage        = optional(bool, true)<br/>    postgresql            = optional(bool, false)<br/>    vault                 = optional(bool, true)<br/>  })</pre> | `{}` | no |
 | <a name="input_freeform_tags"></a> [freeform\_tags](#input\_freeform\_tags) | Free-form tags applied to all supported OCI resources. | `map(string)` | `{}` | no |
+| <a name="input_https_ingress_cidr"></a> [https\_ingress\_cidr](#input\_https\_ingress\_cidr) | Optional CIDR allowed to access HTTPS (TCP 443) on the compute fleet. Set null to create no HTTPS ingress rule. For new custom services, prefer compute\_ingress\_tcp\_rules. | `string` | `null` | no |
 | <a name="input_image_id_override"></a> [image\_id\_override](#input\_image\_id\_override) | Optional explicit OCI image OCID for the compute fleet. Use this if the platform image lookup does not return a match in your region or tenancy. | `string` | `null` | no |
 | <a name="input_load_balancer_backend_instance_keys"></a> [load\_balancer\_backend\_instance\_keys](#input\_load\_balancer\_backend\_instance\_keys) | Set of compute instance keys to register as load balancer backends. Set to null to register all compute instances. | `set(string)` | `null` | no |
 | <a name="input_load_balancer_backend_port"></a> [load\_balancer\_backend\_port](#input\_load\_balancer\_backend\_port) | Port the optional load balancer should use to reach its backend instance. | `number` | `80` | no |

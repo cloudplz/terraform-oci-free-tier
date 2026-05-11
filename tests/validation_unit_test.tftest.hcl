@@ -288,6 +288,16 @@ run "rejects_invalid_compute_ingress_tcp_rule_cidr" {
   expect_failures = [var.compute_ingress_tcp_rules]
 }
 
+run "rejects_invalid_https_ingress_cidr" {
+  command = plan
+
+  variables {
+    https_ingress_cidr = "not-a-cidr"
+  }
+
+  expect_failures = [var.https_ingress_cidr]
+}
+
 run "rejects_block_volume_below_minimum_size" {
   command = plan
 
