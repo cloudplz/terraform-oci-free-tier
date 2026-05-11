@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-05-11
+
+### Added
+
+- New `compute_egress_restricted` variable. When true, replaces the default allow-all egress rule on the compute NSG with restricted outbound rules (DNS TCP/UDP 53, HTTP 80, HTTPS 443, NTP 123). Defaults to false to preserve open egress for VPN or NAT workloads.
+
 ## [1.0.6] - 2026-05-10
 
 ### Added

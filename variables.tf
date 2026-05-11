@@ -236,6 +236,12 @@ variable "compute_ingress_tcp_rules" {
   }
 }
 
+variable "compute_egress_restricted" {
+  description = "When true, replace the default allow-all egress rule on the compute NSG with restricted outbound rules (DNS, HTTP, HTTPS, NTP). Defaults to false to preserve the open egress needed by VPN or NAT workloads."
+  type        = bool
+  default     = false
+}
+
 variable "defined_tags" {
   description = "Defined tags applied to all supported OCI resources."
   type        = map(string)

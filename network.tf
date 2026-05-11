@@ -157,11 +157,50 @@ resource "oci_core_network_security_group" "compute" {
 }
 
 resource "oci_core_network_security_group_security_rule" "compute_egress_all" {
+  count = var.compute_egress_restricted ? 0 : 1
+
   destination               = "0.0.0.0/0"
   destination_type          = "CIDR_BLOCK"
   direction                 = "EGRESS"
   network_security_group_id = oci_core_network_security_group.compute.id
   protocol                  = "all"
+}
+
+resource "oci_core_network_security_group_security_rule" "compute_egress_restricted" {
+  for_each = var.compute_egress_restricted ? {
+    dns_tcp = { protocol = "6", dst_ports = { min = 53, max = 53 } }
+    dns_udp = { protocol = "17", dst_ports = { min = 53, max = 53 } }
+    http    = { protocol = "6", dst_ports = { min = 80, max = 80 } }
+    https   = { protocol = "6", dst_ports = { min = 443, max = 443 } }
+    ntp     = { protocol = "17", dst_ports = { min = 123, max = 123 } }
+  } : {}
+
+  description               = each.key
+  destination               = "0.0.0.0/0"
+  destination_type          = "CIDR_BLOCK"
+  direction                 = "EGRESS"
+  network_security_group_id = oci_core_network_security_group.compute.id
+  protocol                  = each.value.protocol
+
+  dynamic "tcp_options" {
+    for_each = each.value.protocol == "6" ? [1] : []
+    content {
+      destination_port_range {
+        max = each.value.dst_ports.max
+        min = each.value.dst_ports.min
+      }
+    }
+  }
+
+  dynamic "udp_options" {
+    for_each = each.value.protocol == "17" ? [1] : []
+    content {
+      destination_port_range {
+        max = each.value.dst_ports.max
+        min = each.value.dst_ports.min
+      }
+    }
+  }
 }
 
 resource "oci_core_network_security_group_security_rule" "compute_ingress_ssh" {
