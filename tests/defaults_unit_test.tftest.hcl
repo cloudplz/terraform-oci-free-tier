@@ -643,3 +643,32 @@ run "keepalive_disabled_no_user_data_without_explicit" {
     error_message = "A1 instances without block volume mounts should have no user_data when keepalive is disabled."
   }
 }
+
+run "compute_ingress_tcp_rules_create_nsg_rules" {
+  command = plan
+
+  variables {
+    compute_ingress_tcp_rules = {
+      https = {
+        description = "HTTPS service"
+        port        = 443
+        source_cidr = "0.0.0.0/0"
+      }
+    }
+  }
+
+  assert {
+    condition     = length(oci_core_network_security_group_security_rule.compute_ingress_tcp) == 1
+    error_message = "One compute ingress TCP rule should be created."
+  }
+
+  assert {
+    condition     = oci_core_network_security_group_security_rule.compute_ingress_tcp["https"].source == "0.0.0.0/0"
+    error_message = "The compute ingress TCP rule should use the configured source CIDR."
+  }
+
+  assert {
+    condition     = oci_core_network_security_group_security_rule.compute_ingress_tcp["https"].tcp_options[0].destination_port_range[0].min == 443
+    error_message = "The compute ingress TCP rule should use the configured destination port."
+  }
+}

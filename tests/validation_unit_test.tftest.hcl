@@ -258,6 +258,36 @@ run "rejects_invalid_profile_name" {
   expect_failures = [var.profile]
 }
 
+run "rejects_invalid_compute_ingress_tcp_rule_port" {
+  command = plan
+
+  variables {
+    compute_ingress_tcp_rules = {
+      invalid = {
+        port        = 70000
+        source_cidr = "0.0.0.0/0"
+      }
+    }
+  }
+
+  expect_failures = [var.compute_ingress_tcp_rules]
+}
+
+run "rejects_invalid_compute_ingress_tcp_rule_cidr" {
+  command = plan
+
+  variables {
+    compute_ingress_tcp_rules = {
+      invalid = {
+        port        = 443
+        source_cidr = "not-a-cidr"
+      }
+    }
+  }
+
+  expect_failures = [var.compute_ingress_tcp_rules]
+}
+
 run "rejects_block_volume_below_minimum_size" {
   command = plan
 

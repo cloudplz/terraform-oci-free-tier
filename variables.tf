@@ -210,6 +210,32 @@ variable "compute_instances" {
   }
 }
 
+variable "compute_ingress_tcp_rules" {
+  description = "Additional TCP ingress rules for the compute network security group. Use this to expose explicit services such as HTTPS while keeping SSH controlled separately."
+  type = map(object({
+    port        = number
+    source_cidr = string
+    description = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for rule in values(var.compute_ingress_tcp_rules) :
+      floor(rule.port) == rule.port && rule.port >= 1 && rule.port <= 65535
+    ])
+    error_message = "Each compute_ingress_tcp_rules entry must use an integer port from 1 to 65535."
+  }
+
+  validation {
+    condition = alltrue([
+      for rule in values(var.compute_ingress_tcp_rules) :
+      can(cidrhost(rule.source_cidr, 0))
+    ])
+    error_message = "Each compute_ingress_tcp_rules source_cidr must be a valid IPv4 CIDR block."
+  }
+}
+
 variable "defined_tags" {
   description = "Defined tags applied to all supported OCI resources."
   type        = map(string)

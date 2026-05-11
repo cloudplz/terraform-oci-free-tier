@@ -37,6 +37,11 @@ output "compute_instances" {
   }
 }
 
+output "compute_network_security_group_id" {
+  description = "OCID of the compute network security group attached to compute instance VNICs."
+  value       = oci_core_network_security_group.compute.id
+}
+
 output "load_balancer_id" {
   description = "OCID of the optional load balancer, or null when disabled."
   value       = try(oci_load_balancer_load_balancer.main[0].id, null)

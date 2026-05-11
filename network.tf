@@ -154,6 +154,24 @@ resource "oci_core_network_security_group_security_rule" "compute_ingress_ssh" {
   }
 }
 
+resource "oci_core_network_security_group_security_rule" "compute_ingress_tcp" {
+  for_each = var.compute_ingress_tcp_rules
+
+  description               = try(each.value.description, null)
+  direction                 = "INGRESS"
+  network_security_group_id = oci_core_network_security_group.compute.id
+  protocol                  = "6"
+  source                    = each.value.source_cidr
+  source_type               = "CIDR_BLOCK"
+
+  tcp_options {
+    destination_port_range {
+      max = each.value.port
+      min = each.value.port
+    }
+  }
+}
+
 resource "oci_core_network_security_group_security_rule" "compute_ingress_icmp" {
   direction                 = "INGRESS"
   network_security_group_id = oci_core_network_security_group.compute.id
