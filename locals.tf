@@ -135,7 +135,7 @@ locals {
   instance_keys = sort(keys(local.effective_compute_instances))
 
   instance_hostname_labels = {
-    for index, key in local.instance_keys : key => "vm${index + 1}"
+    for key in local.instance_keys : key => key
   }
 
   instance_availability_domains = {
@@ -151,6 +151,11 @@ locals {
   # ---------------------------------------------------------------------------
   keepalive_cloud_config = <<-CLOUDCFG
     #cloud-config
+    merge_how:
+      - name: list
+        settings: [append]
+      - name: dict
+        settings: [no_replace, append_list]
     write_files:
       - path: /usr/local/bin/keepalive.sh
         permissions: '0755'
@@ -188,6 +193,11 @@ locals {
       length(local.instance_mount_points[key]) > 0
       ? trimspace(join("\n", [
         "#cloud-config",
+        "merge_how:",
+        "  - name: list",
+        "    settings: [append]",
+        "  - name: dict",
+        "    settings: [no_replace, append_list]",
         "write_files:",
         "  - path: /usr/local/bin/mount-block-volumes.sh",
         "    permissions: '0755'",
@@ -247,6 +257,10 @@ locals {
 
   instance_cloud_init_parts = {
     for key in local.instance_keys : key => concat(
+      local.instance_raw_user_data[key] != null ? [{
+        content_type = startswith(trimspace(local.instance_raw_user_data[key]), "#cloud-config") ? "text/cloud-config" : "text/x-shellscript"
+        body         = trimspace(local.instance_raw_user_data[key])
+      }] : [],
       var.enable_keepalive ? [{
         content_type = "text/cloud-config"
         body         = trimspace(local.keepalive_cloud_config)
@@ -254,10 +268,6 @@ locals {
       local.instance_mount_cloud_config[key] != null ? [{
         content_type = "text/cloud-config"
         body         = local.instance_mount_cloud_config[key]
-      }] : [],
-      local.instance_raw_user_data[key] != null ? [{
-        content_type = startswith(trimspace(local.instance_raw_user_data[key]), "#cloud-config") ? "text/cloud-config" : "text/x-shellscript"
-        body         = trimspace(local.instance_raw_user_data[key])
       }] : [],
     )
   }
@@ -297,7 +307,7 @@ locals {
   micro_keys = sort(keys(local.effective_amd_micro_instances))
 
   micro_hostname_labels = {
-    for index, key in local.micro_keys : key => "micro${index + 1}"
+    for key in local.micro_keys : key => key
   }
 
   micro_availability_domains = {
@@ -308,13 +318,13 @@ locals {
   # volumes since block volumes can only attach to A1 instances).
   micro_cloud_init_parts = {
     for key in local.micro_keys : key => concat(
-      var.enable_keepalive ? [{
-        content_type = "text/cloud-config"
-        body         = trimspace(local.keepalive_cloud_config)
-      }] : [],
       var.user_data != null ? [{
         content_type = startswith(trimspace(var.user_data), "#cloud-config") ? "text/cloud-config" : "text/x-shellscript"
         body         = trimspace(var.user_data)
+      }] : [],
+      var.enable_keepalive ? [{
+        content_type = "text/cloud-config"
+        body         = trimspace(local.keepalive_cloud_config)
       }] : [],
     )
   }

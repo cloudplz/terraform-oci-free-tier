@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-08-23
+
+### Fixed
+
+- **Multipart cloud-init shadowing**: instances with block volumes silently lost the keepalive cron because multiple `text/cloud-config` parts without merge directives replace each other in cloud-init. Every module-generated cloud-config part now carries `merge_how` (list-append semantics), and the user-provided part is emitted first so explicit user input is never overridden
+- `hostname_label` now equals the instance key instead of `vm{index}`/`micro{index}`, so OS hostnames no longer collide across tenancies using the same module (e.g. PHX `vm1` vs SJC `vm9`)
+- New regression test file `tests/multipart_merge.tftest.hcl` asserting merge directives, part ordering, and hostname labels
+
 ## [1.0.7] - 2026-08-23
 
 ### Added
@@ -215,6 +223,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI for formatting, validation, example validation, and tests
 - `terraform-docs` configuration and helper Makefile targets
 
+[1.0.8]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.5...v1.0.6
 [1.0.2]: https://github.com/cloudplz/terraform-oci-free-tier/compare/v1.0.0...v1.0.2
