@@ -16,7 +16,9 @@ locals {
   availability_domain  = coalesce(var.availability_domain, local.availability_domains[0])
 
   # --- Home region detection (P0) ---
-  # AD names follow the format "{prefix}:{REGION_KEY}-AD-{N}", e.g. "kIdk:PHX-AD-1".
+  # AD names embed either a 3-letter region key ("kIdk:PHX-AD-1", older regions)
+  # or the full region name ("kvUq:US-SANJOSE-1-AD-1", newer regions), so the
+  # extracted token must be compared against both home region key and name.
   current_region_key = try(
     upper(split("-AD-", split(":", data.oci_identity_availability_domains.available.availability_domains[0].name)[1])[0]),
     null
@@ -24,6 +26,11 @@ locals {
 
   home_region_key = try(
     [for r in data.oci_identity_region_subscriptions.home[0].region_subscriptions : upper(r.region_key) if r.is_home_region][0],
+    null
+  )
+
+  home_region_name = try(
+    [for r in data.oci_identity_region_subscriptions.home[0].region_subscriptions : upper(r.region_name) if r.is_home_region][0],
     null
   )
 
@@ -169,16 +176,16 @@ locals {
   # (e.g. volume not yet attached on first boot), a cron job retries every
   # 5 minutes. Once all mounts succeed the cron job removes itself.
   # ---------------------------------------------------------------------------
-  _instance_mount_points = {
+  instance_mount_points = {
     for key in local.instance_keys : key => [
       for vk, vol in local.effective_block_volumes : vol.mount_point
       if vol.attach_to == key && vol.mount_point != null
     ]
   }
 
-  _instance_mount_cloud_config = {
+  instance_mount_cloud_config = {
     for key in local.instance_keys : key => (
-      length(local._instance_mount_points[key]) > 0
+      length(local.instance_mount_points[key]) > 0
       ? trimspace(join("\n", [
         "#cloud-config",
         "write_files:",
@@ -188,7 +195,7 @@ locals {
         "      #!/bin/bash",
         "      set -euo pipefail",
         "      BOOT_DISK=$(lsblk -nro PKNAME \"$(findmnt -n -o SOURCE /)\" | head -1)",
-        "      MOUNT_POINTS=(${join(" ", [for mp in local._instance_mount_points[key] : "\"${mp}\""])})",
+        "      MOUNT_POINTS=(${join(" ", [for mp in local.instance_mount_points[key] : "\"${mp}\""])})",
         "      IDX=0",
         "      for DEV in $(lsblk -dnpo NAME,TYPE | awk '$2==\"disk\"{print $1}'); do",
         "        [ \"$(basename \"$DEV\")\" = \"$BOOT_DISK\" ] && continue",
@@ -230,7 +237,7 @@ locals {
   # mount cloud-config, and user-provided data. A single part is passed through
   # as-is; multiple parts are wrapped in a multipart MIME envelope.
   # ---------------------------------------------------------------------------
-  _instance_raw_user_data = {
+  instance_raw_user_data = {
     for key in local.instance_keys : key => (
       try(local.effective_compute_instances[key].user_data, null) != null
       ? local.effective_compute_instances[key].user_data
@@ -238,29 +245,29 @@ locals {
     )
   }
 
-  _instance_cloud_init_parts = {
+  instance_cloud_init_parts = {
     for key in local.instance_keys : key => concat(
       var.enable_keepalive ? [{
         content_type = "text/cloud-config"
         body         = trimspace(local.keepalive_cloud_config)
       }] : [],
-      local._instance_mount_cloud_config[key] != null ? [{
+      local.instance_mount_cloud_config[key] != null ? [{
         content_type = "text/cloud-config"
-        body         = local._instance_mount_cloud_config[key]
+        body         = local.instance_mount_cloud_config[key]
       }] : [],
-      local._instance_raw_user_data[key] != null ? [{
-        content_type = startswith(trimspace(local._instance_raw_user_data[key]), "#cloud-config") ? "text/cloud-config" : "text/x-shellscript"
-        body         = trimspace(local._instance_raw_user_data[key])
+      local.instance_raw_user_data[key] != null ? [{
+        content_type = startswith(trimspace(local.instance_raw_user_data[key]), "#cloud-config") ? "text/cloud-config" : "text/x-shellscript"
+        body         = trimspace(local.instance_raw_user_data[key])
       }] : [],
     )
   }
 
   instance_user_data = {
     for key in local.instance_keys : key => (
-      length(local._instance_cloud_init_parts[key]) == 0
+      length(local.instance_cloud_init_parts[key]) == 0
       ? null
-      : length(local._instance_cloud_init_parts[key]) == 1
-      ? local._instance_cloud_init_parts[key][0].body
+      : length(local.instance_cloud_init_parts[key]) == 1
+      ? local.instance_cloud_init_parts[key][0].body
       : join("\n", concat(
         [
           "Content-Type: multipart/mixed; boundary=\"${local.mime_boundary}\"",
@@ -268,7 +275,7 @@ locals {
           "",
         ],
         flatten([
-          for part in local._instance_cloud_init_parts[key] : [
+          for part in local.instance_cloud_init_parts[key] : [
             "--${local.mime_boundary}",
             "Content-Type: ${part.content_type}; charset=\"us-ascii\"",
             "MIME-Version: 1.0",
@@ -299,7 +306,7 @@ locals {
 
   # User data for micro instances (module-level user_data + keepalive; no block
   # volumes since block volumes can only attach to A1 instances).
-  _micro_cloud_init_parts = {
+  micro_cloud_init_parts = {
     for key in local.micro_keys : key => concat(
       var.enable_keepalive ? [{
         content_type = "text/cloud-config"
@@ -314,10 +321,10 @@ locals {
 
   micro_user_data = {
     for key in local.micro_keys : key => (
-      length(local._micro_cloud_init_parts[key]) == 0
+      length(local.micro_cloud_init_parts[key]) == 0
       ? null
-      : length(local._micro_cloud_init_parts[key]) == 1
-      ? local._micro_cloud_init_parts[key][0].body
+      : length(local.micro_cloud_init_parts[key]) == 1
+      ? local.micro_cloud_init_parts[key][0].body
       : join("\n", concat(
         [
           "Content-Type: multipart/mixed; boundary=\"${local.mime_boundary}\"",
@@ -325,7 +332,7 @@ locals {
           "",
         ],
         flatten([
-          for part in local._micro_cloud_init_parts[key] : [
+          for part in local.micro_cloud_init_parts[key] : [
             "--${local.mime_boundary}",
             "Content-Type: ${part.content_type}; charset=\"us-ascii\"",
             "MIME-Version: 1.0",

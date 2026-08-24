@@ -81,7 +81,7 @@ check "home_region" {
       var.tenancy_id == null ||
       local.current_region_key == null ||
       local.home_region_key == null ||
-      local.current_region_key == local.home_region_key
+      contains([local.home_region_key, local.home_region_name], local.current_region_key)
     )
     error_message = "The OCI provider appears to be configured for region '${coalesce(local.current_region_key, "unknown")}' but the tenancy home region is '${coalesce(local.home_region_key, "unknown")}'. Always Free resources are only free in the home region and will incur charges elsewhere."
   }

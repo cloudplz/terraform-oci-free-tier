@@ -444,7 +444,7 @@ regional availability at any time.
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11, < 2.0.0 |
 | <a name="requirement_oci"></a> [oci](#requirement\_oci) | ~> 8.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
@@ -452,14 +452,14 @@ regional availability at any time.
 ## Providers
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="provider_oci"></a> [oci](#provider\_oci) | 8.9.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
 
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [oci_budget_alert_rule.any_spending](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/budget_alert_rule) | resource |
 | [oci_budget_budget.free_tier](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/budget_budget) | resource |
 | [oci_core_default_security_list.main](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_default_security_list) | resource |
@@ -471,6 +471,7 @@ regional availability at any time.
 | [oci_core_network_security_group.load_balancer](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group) | resource |
 | [oci_core_network_security_group.network_load_balancer](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group) | resource |
 | [oci_core_network_security_group_security_rule.compute_egress_all](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
+| [oci_core_network_security_group_security_rule.compute_egress_restricted](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
 | [oci_core_network_security_group_security_rule.compute_ingress_https](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
 | [oci_core_network_security_group_security_rule.compute_ingress_icmp](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
 | [oci_core_network_security_group_security_rule.compute_ingress_icmp_echo](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_network_security_group_security_rule) | resource |
@@ -515,7 +516,7 @@ regional availability at any time.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_compartment_id"></a> [compartment\_id](#input\_compartment\_id) | OCID of the compartment where all resources will be created. | `string` | n/a | yes |
 | <a name="input_name"></a> [name](#input\_name) | Name prefix applied to created resources. Keep it short and lowercase. | `string` | n/a | yes |
 | <a name="input_ssh_public_key"></a> [ssh\_public\_key](#input\_ssh\_public\_key) | SSH public key added to each compute instance via cloud-init metadata. | `string` | n/a | yes |
@@ -524,6 +525,7 @@ regional availability at any time.
 | <a name="input_block_volumes"></a> [block\_volumes](#input\_block\_volumes) | Map of block volumes to create and attach to compute instances. Shares the 200 GB Always Free budget with boot volumes. Set to null to use the profile default. | <pre>map(object({<br/>    attach_to   = string<br/>    size_gb     = number<br/>    mount_point = optional(string)<br/>  }))</pre> | `null` | no |
 | <a name="input_budget_alert_email"></a> [budget\_alert\_email](#input\_budget\_alert\_email) | Email address for the budget alert rule. When set together with tenancy\_id and features.budget, the module creates a $1 monthly budget with an alert that fires when spending reaches the budget amount. | `string` | `null` | no |
 | <a name="input_budget_amount"></a> [budget\_amount](#input\_budget\_amount) | Monthly budget amount in the tenancy currency. Only used when features.budget is true and tenancy\_id is set. | `number` | `1` | no |
+| <a name="input_compute_egress_restricted"></a> [compute\_egress\_restricted](#input\_compute\_egress\_restricted) | When true, replace the default allow-all egress rule on the compute NSG with restricted outbound rules (DNS, HTTP, HTTPS, NTP). Defaults to false to preserve the open egress needed by VPN or NAT workloads. | `bool` | `false` | no |
 | <a name="input_compute_ingress_tcp_rules"></a> [compute\_ingress\_tcp\_rules](#input\_compute\_ingress\_tcp\_rules) | Additional TCP ingress rules for the compute network security group. Use this to expose explicit services such as HTTPS while keeping SSH controlled separately. | <pre>map(object({<br/>    port        = number<br/>    source_cidr = string<br/>    description = optional(string)<br/>  }))</pre> | `{}` | no |
 | <a name="input_compute_instances"></a> [compute\_instances](#input\_compute\_instances) | Map of Always Free A1 instances to create. Set to null to use the profile default. When set, overrides the profile entirely. | <pre>map(object({<br/>    assign_public_ip    = optional(bool, true)<br/>    availability_domain = optional(string)<br/>    boot_volume_gb      = number<br/>    memory_gb           = number<br/>    ocpus               = number<br/>    subnet_role         = optional(string, "public")<br/>    user_data           = optional(string)<br/>  }))</pre> | `null` | no |
 | <a name="input_defined_tags"></a> [defined\_tags](#input\_defined\_tags) | Defined tags applied to all supported OCI resources. | `map(string)` | `{}` | no |
@@ -557,7 +559,7 @@ regional availability at any time.
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_amd_micro_instances"></a> [amd\_micro\_instances](#output\_amd\_micro\_instances) | Map of AMD Micro instance details keyed by instance name, or an empty map when none are configured. |
 | <a name="output_availability_domain"></a> [availability\_domain](#output\_availability\_domain) | Default availability domain used for compute instances without an explicit per-instance override. |
 | <a name="output_block_volumes"></a> [block\_volumes](#output\_block\_volumes) | Map of block volume details keyed by volume name, or an empty map when none are configured. |
