@@ -1,0 +1,2 @@
+# gitleaks: verified false positives (test fixtures, 1Password item IDs, book examples, commit hashes)
+95b77445c662b6877f0b24276d58672af80b57db:database.tf:hashicorp-tf-password:54
