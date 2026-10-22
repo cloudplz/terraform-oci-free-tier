@@ -1,0 +1,5 @@
+status: unknown
+allowed: "未登记：开工前先向 PZ 确认状态"
+reason: "映射表未覆盖，待 PZ 登记"
+since: 2026-10-22
+review_by: 2026-11-05
